@@ -7,6 +7,7 @@ import (
 
 // Notify -
 type Notify interface {
+	sync.Locker
 	Subscribe() func(context.Context) error
 	Broadcast()
 }
@@ -17,6 +18,18 @@ type rawNotify struct {
 	c      chan struct{}
 }
 
+func (s *rawNotify) Lock() {
+	if s.Locker != nil {
+		s.Locker.Lock()
+	}
+}
+
+func (s *rawNotify) Unlock() {
+	if s.Locker != nil {
+		s.Locker.Unlock()
+	}
+}
+
 func (s *rawNotify) Subscribe() func(context.Context) error {
 	s.m.Lock()
 	defer s.m.Unlock()
@@ -24,10 +37,8 @@ func (s *rawNotify) Subscribe() func(context.Context) error {
 	c := s.c
 
 	return func(ctx context.Context) error {
-		if s.Locker != nil {
-			s.Locker.Unlock()
-			defer s.Locker.Lock()
-		}
+		s.Unlock()
+		defer s.Lock()
 
 		select {
 		case <-c:
